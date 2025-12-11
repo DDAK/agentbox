@@ -1,0 +1,22 @@
+[project]
+name = "coding-agents"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.40.0",
+    "gradio>=5.49.0,<6.0",
+    "gradio-browser>=0.0.3",
+    "gradio-aicontext>=0.0.4",
+    "openai>=2.9.0",
+    "pillow>=8.0,<12.0",
+    "python-dotenv>=1.2.1",
+    "rich>=14.2.0",
+    "tiktoken>=0.12.0",
+    "duckduckgo-search>=6.0.0",
+    "beautifulsoup4>=4.12.0",
+    "html2text>=2024.2.26",
+    "requests>=2.31.0",
+    "litellm>=1.40.0",
+]
