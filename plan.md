@@ -2,7 +2,12 @@
 
 ## Executive Summary
 
-This plan integrates the `memory_system` framework into `coding_agents` to enable agents that can execute millions of steps with persistent memory and intelligent context management. The goal is to transform ephemeral, session-bound agents into persistent, resumable agents capable of long-running autonomous tasks.
+This plan builds a memory system inside `coding_agents/lib/memory/` to enable agents that can execute millions of steps with persistent memory and intelligent context management. The goal is to transform ephemeral, session-bound agents into persistent, resumable agents capable of long-running autonomous tasks.
+
+**Key Architecture Decisions:**
+- Memory system location: `coding_agents/lib/memory/` (integrated, not separate package)
+- Storage backend: **Markdown files** (human-readable, agent-friendly, no database)
+- Minimal dependencies: Standard library + PyYAML only
 
 ---
 
@@ -18,15 +23,15 @@ This plan integrates the `memory_system` framework into `coding_agents` to enabl
 | Long-term Knowledge | State snapshot only | No accumulated knowledge across sessions |
 | Step Limit | 100 steps default | Not designed for millions of steps |
 
-### memory_system Capabilities
+### Memory System Capabilities (To Be Built)
 
-| Capability | Description | Gap for Integration |
-|------------|-------------|---------------------|
-| Short-Term Memory | FIFO buffer, 10 items | In-memory only, needs persistence |
-| Long-Term Memory | Keyword-based retrieval | In-memory dict, needs database backend |
-| Reflection | LLM summarization | Placeholder implementation |
-| Todo Management | File-based | Already persistent |
-| Context Retrieval | Combined STM + LTM | Needs integration with agent loop |
+| Capability | Description | Implementation |
+|------------|-------------|----------------|
+| Short-Term Memory | FIFO buffer, 50-100 items | Markdown file (buffer.md) |
+| Long-Term Memory | Keyword-based retrieval | Markdown files (knowledge.md, learnings.md) |
+| Reflection | LLM summarization | Real LLM integration |
+| Session Management | Checkpoints and resume | Markdown with YAML frontmatter |
+| Context Retrieval | Combined STM + LTM | Integration with agent loop |
 
 ---
 
@@ -49,19 +54,19 @@ This plan integrates the `memory_system` framework into `coding_agents` to enabl
 │                            │                                        │
 │                            ▼                                        │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                  MemoryManager (NEW)                          │   │
+│  │              MemoryManager (lib/memory/manager.py)            │   │
 │  │                                                               │   │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │   │
-│  │  │ ShortTerm    │  │ LongTerm     │  │ Episode      │       │   │
-│  │  │ Memory       │  │ Memory       │  │ Memory (NEW) │       │   │
-│  │  │ (Working)    │  │ (Knowledge)  │  │ (Sessions)   │       │   │
+│  │  │ ShortTerm    │  │ LongTerm     │  │ Session      │       │   │
+│  │  │ Memory       │  │ Memory       │  │ Manager      │       │   │
+│  │  │ (buffer.md)  │  │ (knowledge)  │  │ (sessions/)  │       │   │
 │  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │   │
 │  │         │                 │                 │                │   │
 │  │         └─────────────────┼─────────────────┘                │   │
 │  │                           ▼                                   │   │
 │  │              ┌─────────────────────────┐                     │   │
-│  │              │   Persistence Layer     │                     │   │
-│  │              │   (SQLite / Arrow)      │                     │   │
+│  │              │   Markdown File Store   │                     │   │
+│  │              │   (.agent_memory/)      │                     │   │
 │  │              └─────────────────────────┘                     │   │
 │  │                                                               │   │
 │  └─────────────────────────────────────────────────────────────┘   │
@@ -69,78 +74,81 @@ This plan integrates the `memory_system` framework into `coding_agents` to enabl
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Memory Storage Structure (Markdown Files)
+
+```
+.agent_memory/
+├── index.md                        # Quick lookup index
+├── sessions/
+│   └── session_xxx.md              # Session checkpoints with YAML frontmatter
+├── long_term/
+│   ├── knowledge.md                # Facts, patterns, API info
+│   └── learnings.md                # What agent learned from errors
+└── short_term/
+    └── buffer.md                   # Recent observations (FIFO)
+```
+
 ### Memory Types for Long-Running Agents
 
 | Memory Type | Purpose | Persistence | Capacity |
 |-------------|---------|-------------|----------|
-| **Short-Term** | Recent observations, current context | Session file | 50-100 items |
-| **Long-Term** | Accumulated knowledge, patterns | SQLite + embeddings | Unlimited |
-| **Episodic** | Session checkpoints, resumable state | SQLite | Per-session |
-| **Procedural** | Learned tool sequences, workflows | JSON files | Per-task type |
+| **Short-Term** | Recent observations, current context | buffer.md | 50-100 items |
+| **Long-Term** | Accumulated knowledge, patterns | knowledge.md, learnings.md | Unlimited |
+| **Session** | Session checkpoints, resumable state | sessions/session_xxx.md | Per-session |
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Persistence Layer for memory_system
+### Phase 1: Markdown-Based Persistence Layer
 
-**Objective**: Add disk persistence to memory_system without breaking existing API.
+**Objective**: Add disk persistence using markdown files for human-readable, agent-friendly storage.
 
-#### 1.1 SQLite Backend for Long-Term Memory
+#### 1.1 Markdown Store for Long-Term Memory
 
-**File**: `memory_system/persistence/sqlite_store.py`
+**File**: `coding_agents/lib/memory/persistence/markdown_store.py`
 
 ```python
-class SQLiteMemoryStore:
-    """Persistent storage backend for long-term memories."""
+class MarkdownMemoryStore:
+    """Markdown-based storage for agent memories - human-readable and agent-friendly."""
 
-    def __init__(self, db_path: str):
-        self.db_path = db_path
-        self._init_schema()
+    def __init__(self, storage_path: str):
+        self.storage_path = Path(storage_path)
+        self._init_structure()
 
-    def _init_schema(self):
-        """Create tables for memories, embeddings, and metadata."""
-        # memories: id, content, timestamp, memory_type, embedding_id
-        # embeddings: id, vector (blob), model
-        # sessions: id, start_time, end_time, summary, checkpoint_path
+    def _init_structure(self):
+        """Create directory structure for memories."""
+        (self.storage_path / "sessions").mkdir(parents=True, exist_ok=True)
+        (self.storage_path / "long_term").mkdir(exist_ok=True)
+        (self.storage_path / "short_term").mkdir(exist_ok=True)
+
+    def add(self, content: str, memory_type: str, category: str = "general") -> str:
+        """Add memory to appropriate markdown file."""
         pass
 
-    def add(self, content: str, memory_type: str, embedding: list[float] = None) -> str:
-        """Add memory with optional embedding."""
+    def retrieve(self, query: str, top_k: int = 10) -> list[dict]:
+        """Retrieve by keyword search in markdown files."""
         pass
 
-    def retrieve(self, query: str, top_k: int = 10, embedding: list[float] = None) -> list[dict]:
-        """Retrieve by keyword or embedding similarity."""
+    def save_session(self, session_id: str, state: dict) -> str:
+        """Save session checkpoint as markdown with YAML frontmatter."""
         pass
 
-    def checkpoint(self, session_id: str, state: dict) -> str:
-        """Save session checkpoint for resumption."""
-        pass
-
-    def restore(self, session_id: str) -> dict:
-        """Restore session from checkpoint."""
+    def load_session(self, session_id: str) -> dict:
+        """Load session from markdown checkpoint."""
         pass
 ```
 
-#### 1.2 Update LongTermMemory to Use Persistence
+#### 1.2 Session Checkpointing with Markdown
 
-**File**: `memory_system/memory_types/long_term.py`
-
-Changes:
-- Add `storage_backend` parameter (default: in-memory for backward compatibility)
-- Implement `save()` and `load()` methods
-- Add embedding support for semantic retrieval
-
-#### 1.3 Session Checkpointing
-
-**File**: `memory_system/session.py`
+**File**: `coding_agents/lib/memory/session.py`
 
 ```python
 class SessionManager:
-    """Manages agent session lifecycle and checkpoints."""
+    """Manages agent session lifecycle using markdown checkpoints."""
 
     def __init__(self, storage_path: str):
-        self.storage_path = storage_path
+        self.storage_path = Path(storage_path)
         self.current_session_id = None
 
     def start_session(self, resume_id: str = None) -> str:
@@ -148,15 +156,15 @@ class SessionManager:
         pass
 
     def checkpoint(self, state: dict, step: int):
-        """Save checkpoint at current step."""
+        """Save checkpoint to sessions/session_xxx.md."""
         pass
 
     def end_session(self, summary: str = None):
-        """Finalize and close session."""
+        """Finalize session with summary."""
         pass
 
     def list_sessions(self) -> list[dict]:
-        """List all available sessions."""
+        """List all available sessions from sessions/ directory."""
         pass
 ```
 
@@ -164,7 +172,7 @@ class SessionManager:
 
 ### Phase 2: Integration with coding_agents
 
-**Objective**: Connect memory_system to the coding_agent loop.
+**Objective**: Connect memory module to the coding_agent loop.
 
 #### 2.1 Add MemoryManager to CodingAgent
 
@@ -172,6 +180,8 @@ class SessionManager:
 
 Changes:
 ```python
+from lib.memory import MemoryManager
+
 class CodingAgent:
     def __init__(
         self,
@@ -181,7 +191,9 @@ class CodingAgent:
         resume_session: str = None,           # NEW
     ):
         # Initialize memory system
-        self.memory_manager = self._init_memory(memory_path, enable_persistence)
+        self.memory_manager = None
+        if enable_persistence:
+            self.memory_manager = MemoryManager(memory_path)
         if resume_session:
             self._restore_session(resume_session)
 ```
@@ -197,6 +209,8 @@ Integration points:
 4. **Checkpointing**: Save state every N steps
 
 ```python
+from lib.memory.integration import inject_memories
+
 def coding_agent(
     client,
     sbx,
@@ -240,33 +254,6 @@ def coding_agent(
             memory_manager.checkpoint(step, messages)
 
         step += 1
-```
-
-#### 2.3 Replace Compression with Intelligent Context Management
-
-Current compression is lossy. Replace with:
-
-1. **Semantic Retrieval**: Query long-term memory for relevant past experiences
-2. **Hierarchical Summarization**: Multiple levels of abstraction
-3. **Selective Retention**: Keep tool results and key decisions in detail
-
-```python
-def manage_context(
-    messages: list[dict],
-    memory_manager: MemoryManager,
-    token_limit: int = 60000,
-    preserve_recent: int = 10,
-) -> list[dict]:
-    """
-    Intelligent context management that preserves important information.
-
-    Strategy:
-    1. Always keep: system prompt, recent N messages, current tool calls
-    2. Summarize: older conversation turns
-    3. Retrieve: relevant long-term memories for current task
-    4. Inject: retrieved memories as "assistant notes"
-    """
-    pass
 ```
 
 ---
@@ -365,15 +352,11 @@ class AdaptiveReflectionTrigger:
 
 ---
 
-### Phase 4: Memory System Fixes Required
+### Phase 4: Additional Features
 
-Based on analysis, the following fixes are needed in `memory_system`:
+#### 4.1 LLM Integration for Summarization
 
-#### 4.1 LLM Integration (Critical)
-
-The `_summarize_with_llm()` is currently a placeholder. Need real implementation:
-
-**File**: `memory_system/manager.py`
+**File**: `coding_agents/lib/memory/manager.py`
 
 ```python
 def _summarize_with_llm(self, memories: list[str]) -> str:
@@ -388,47 +371,37 @@ def _summarize_with_llm(self, memories: list[str]) -> str:
 
 Provide a 1-2 sentence summary capturing the key information."""
 
-    response = self.llm_client.generate(prompt)
-    return response.text
+    response = self.llm_client.chat.completions.create(
+        model=self.summary_model,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
 ```
 
-#### 4.2 Persistence Backend (Critical)
+#### 4.2 Semantic Retrieval (Optional)
 
-Current LongTermMemory uses in-memory dict. Add SQLite:
+Add embedding support for better retrieval:
 
-**File**: `memory_system/memory_types/long_term.py`
-
-```python
-class LongTermMemory(BaseMemory):
-    def __init__(self, storage_path: str = None):
-        self.storage_path = storage_path
-        if storage_path:
-            self._init_sqlite()
-        else:
-            self.memories = {}  # Backward compatible
-```
-
-#### 4.3 Semantic Retrieval (Important)
-
-Keyword matching is weak. Add embedding support:
+**File**: `coding_agents/lib/memory/embeddings.py`
 
 ```python
 def retrieve(self, query: str, top_k: int = 5, use_embeddings: bool = True) -> list[str]:
-    if use_embeddings and self.embedding_model:
-        query_embedding = self.embedding_model.encode(query)
-        return self._similarity_search(query_embedding, top_k)
+    if use_embeddings and self.embedding_provider:
+        return self._similarity_search(query, top_k)
     else:
         return self._keyword_search(query, top_k)
 ```
 
-#### 4.4 Thread Safety (Important for Scale)
+#### 4.3 Thread Safety
 
 Add locking for concurrent access:
+
+**File**: `coding_agents/lib/memory/manager.py`
 
 ```python
 import threading
 
-class ThreadSafeMemoryManager:
+class MemoryManager:
     def __init__(self, ...):
         self._lock = threading.RLock()
 
@@ -441,23 +414,31 @@ class ThreadSafeMemoryManager:
 
 ## File Changes Summary
 
-### New Files
+### New Files - Inside coding_agents/lib/memory/
 
-| File | Purpose |
-|------|---------|
-| `memory_system/persistence/__init__.py` | Persistence module |
-| `memory_system/persistence/sqlite_store.py` | SQLite backend |
-| `memory_system/persistence/checkpoint.py` | Checkpoint management |
-| `memory_system/session.py` | Session lifecycle management |
-| `memory_system/embeddings.py` | Embedding model integration |
-| `coding_agents/lib/memory_integration.py` | Integration layer |
+```
+coding_agents/lib/memory/
+├── __init__.py                     # Package exports
+├── manager.py                      # MemoryManager - central orchestrator
+├── session.py                      # SessionManager - lifecycle & checkpoints
+├── embeddings.py                   # EmbeddingProvider - semantic retrieval (optional)
+├── consolidation.py                # HierarchicalMemory - scale optimization
+├── types/
+│   ├── __init__.py
+│   ├── base.py                     # BaseMemory abstract class
+│   ├── short_term.py               # ShortTermMemory - FIFO buffer
+│   └── long_term.py                # LongTermMemory - markdown-based knowledge
+├── persistence/
+│   ├── __init__.py
+│   ├── markdown_store.py           # MarkdownMemoryStore - markdown file backend
+│   └── checkpoint.py               # CheckpointManager - session snapshots
+└── integration.py                  # Memory injection and context management
+```
 
 ### Modified Files
 
 | File | Changes |
 |------|---------|
-| `memory_system/memory_types/long_term.py` | Add persistence, embeddings |
-| `memory_system/manager.py` | Real LLM integration, session support |
 | `coding_agents/agent.py` | Add memory initialization, resume support |
 | `coding_agents/lib/coding_agent.py` | Integrate memory into loop |
 | `coding_agents/main.py` | Add CLI flags for memory/resume |
@@ -532,26 +513,14 @@ python main.py sessions delete <id>   # Delete session
 
 ## Dependencies to Add
 
-### memory_system
+### coding_agents (add to requirements.txt)
 
-```toml
-[project.dependencies]
-# Existing
-pyarrow = ">=22.0.0"
-
-# New
-sentence-transformers = ">=2.2.0"  # Local embeddings
-sqlalchemy = ">=2.0"               # Database abstraction
+```
+pyyaml>=6.0                        # YAML frontmatter parsing for session files
+# Optional: sentence-transformers>=2.2.0  # Local embeddings (if semantic search needed)
 ```
 
-### coding_agents
-
-```toml
-[project.dependencies]
-# Add reference to memory_system
-memory-system = { path = "../memory_system" }
-# Or if published: memory-system = ">=1.0.0"
-```
+**Note:** Memory system is integrated into `coding_agents/lib/memory/` - no external package needed. Markdown-based storage requires minimal dependencies (standard library + PyYAML).
 
 ---
 

@@ -3,6 +3,8 @@ Universal AI Agent
 
 This module provides a universal AI agent that can handle coding, research,
 file operations, and more using local or Docker sandbox environments.
+
+Features persistent memory for long-running sessions.
 """
 
 import os
@@ -17,6 +19,7 @@ from lib.utils import create_sandbox, clear_sandboxes
 from lib.sandbox import BaseSandbox
 from lib.logger import logger
 from lib.llm_client import create_llm_client
+from lib.memory import MemoryManager
 from helper import load_env, setup_api_keys_for_litellm
 
 
@@ -43,6 +46,10 @@ class CodingAgent:
         max_steps: int = 100,
         system_prompt: Optional[str] = None,
         docker_image: Optional[str] = None,
+        memory_path: str = ".agent_memory",
+        enable_persistence: bool = True,
+        resume_session: Optional[str] = None,
+        checkpoint_interval: int = 100,
     ):
         """
         Initialize the coding agent.
@@ -58,6 +65,10 @@ class CodingAgent:
             max_steps: Maximum number of agent steps (default: 100)
             system_prompt: Custom system prompt (default: SYSTEM_PROMPT_DEFAULT)
             docker_image: Docker image to use (only for docker sandbox)
+            memory_path: Path for persistent memory storage (default: ".agent_memory")
+            enable_persistence: Enable persistent memory (default: True)
+            resume_session: Session ID to resume (default: None)
+            checkpoint_interval: Steps between checkpoints (default: 100)
         """
         # Load environment variables and set up API keys for LiteLLM
         setup_api_keys_for_litellm()
@@ -72,10 +83,45 @@ class CodingAgent:
         self.max_steps = max_steps
         self.system_prompt = system_prompt or SYSTEM_PROMPT_DEFAULT
         self.docker_image = docker_image
+        self.checkpoint_interval = checkpoint_interval
 
         # Initialize sandbox
         self.sbx: Optional[BaseSandbox] = None
         self.messages = []
+
+        # Initialize memory system
+        self.memory_manager: Optional[MemoryManager] = None
+        if enable_persistence:
+            self._init_memory(memory_path)
+            if resume_session:
+                self._restore_session(resume_session)
+
+    def _init_memory(self, memory_path: str):
+        """Initialize the memory manager."""
+        try:
+            self.memory_manager = MemoryManager(
+                storage_path=memory_path,
+                llm_client=self.client,
+            )
+            logger.info(f"Memory system initialized at {memory_path}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize memory system: {e}")
+            self.memory_manager = None
+
+    def _restore_session(self, session_id: str):
+        """Restore a previous session."""
+        if not self.memory_manager:
+            logger.warning("Cannot restore session: memory system not initialized")
+            return
+
+        state = self.memory_manager.restore_session(session_id)
+        if state:
+            # Restore messages if available
+            if "messages" in state:
+                self.messages = state["messages"]
+            logger.info(f"Restored session {session_id} at step {state.get('step', 0)}")
+        else:
+            logger.warning(f"Session {session_id} not found")
 
     def setup_sandbox(self) -> BaseSandbox:
         """Create and setup the sandbox environment."""
@@ -121,6 +167,8 @@ class CodingAgent:
             system=self.system_prompt,
             messages=self.messages,
             model=self.model,
+            memory_manager=self.memory_manager,
+            checkpoint_interval=self.checkpoint_interval,
         )
 
     def run_with_logging(self, query: str):
@@ -147,7 +195,27 @@ class CodingAgent:
             system=self.system_prompt,
             messages=self.messages,
             model=self.model,
+            memory_manager=self.memory_manager,
+            checkpoint_interval=self.checkpoint_interval,
         )
+
+    def list_sessions(self) -> list[dict]:
+        """List available sessions."""
+        if not self.memory_manager:
+            return []
+        return self.memory_manager.list_sessions()
+
+    def get_current_session(self) -> Optional[str]:
+        """Get the current session ID."""
+        if not self.memory_manager:
+            return None
+        return self.memory_manager.current_session_id
+
+    def end_session(self, summary: str = "") -> Optional[str]:
+        """End the current session."""
+        if not self.memory_manager:
+            return None
+        return self.memory_manager.end_session(summary=summary)
 
     def launch_ui(self, share: bool = True, height: int = 800):
         """

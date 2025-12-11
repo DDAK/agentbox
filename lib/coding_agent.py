@@ -1,5 +1,5 @@
 import json
-from typing import Generator, Literal, Optional, Callable
+from typing import Generator, Literal, Optional, Callable, Any
 import re
 from .logger import logger, log_tool_call
 from .prompts import *
@@ -7,6 +7,7 @@ import base64
 from .tools import execute_tool
 from .sandbox import BaseSandbox
 from .model_config import get_model_config, ModelConfig
+from .memory.integration import inject_memories, extract_observation, should_checkpoint
 
 # IPython is optional (only needed for notebook environments)
 try:
@@ -141,6 +142,8 @@ def coding_agent(
     messages: Optional[list[dict]] = None,
     usage: Optional[int] = 0,
     model: str = "gpt-4.1-mini",
+    memory_manager: Optional[Any] = None,
+    checkpoint_interval: int = 100,
     **model_kwargs,
 ) -> Generator[tuple[dict, dict, int], None, tuple[list[dict], int]]:
     """
@@ -157,6 +160,8 @@ def coding_agent(
         messages: Conversation history
         usage: Token usage counter
         model: Model name (supports OpenAI, Anthropic, Gemini)
+        memory_manager: Optional MemoryManager for persistent memory
+        checkpoint_interval: Steps between checkpoints (default: 100)
         **model_kwargs: Additional model parameters
     """
     # Get model configuration for dynamic system role and compression
@@ -173,14 +178,24 @@ def coding_agent(
     steps = 0
     # continue till max_steps
     while steps < max_steps:
-        messages = maybe_compress_messages(
-            client, clean_messages_for_llm(messages), usage, model_config
+        # Inject relevant memories from long-term storage
+        messages_for_llm = clean_messages_for_llm(messages)
+        if memory_manager:
+            try:
+                relevant_memories = memory_manager.retrieve_context(query, top_k=10)
+                if relevant_memories:
+                    messages_for_llm = inject_memories(messages_for_llm, relevant_memories)
+            except Exception as e:
+                logger.warning(f"Failed to retrieve memories: {e}")
+
+        messages_for_llm = maybe_compress_messages(
+            client, messages_for_llm, usage, model_config
         )
         response = client.responses.create(
             model=model,
             input=[
                 {"role": model_config.system_role, "content": system},
-                *clean_messages_for_llm(messages),
+                *messages_for_llm,
             ],
             tools=tools_schemas,
             **model_kwargs,
@@ -203,7 +218,30 @@ def coding_agent(
                 messages.append(result_msg)
                 yield result_msg, messages, usage
 
+                # Store observation in memory
+                if memory_manager:
+                    try:
+                        result_str = json.dumps(result) if isinstance(result, dict) else str(result)
+                        observation = extract_observation(name, result_str, part.arguments)
+                        memory_manager.add_memory(observation, memory_type="observation", tool_name=name)
+                    except Exception as e:
+                        logger.warning(f"Failed to store observation: {e}")
+
         steps += 1
+
+        # Periodic checkpointing
+        if memory_manager and should_checkpoint(steps, checkpoint_interval):
+            try:
+                memory_manager.checkpoint(
+                    step=steps,
+                    messages=messages,
+                    task=query[:200],
+                    progress=f"Step {steps}/{max_steps}",
+                )
+                logger.info(f"[agent] 💾 Checkpoint saved at step {steps}")
+            except Exception as e:
+                logger.warning(f"Failed to save checkpoint: {e}")
+
         if not has_function_call:
             break
 

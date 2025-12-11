@@ -24,18 +24,33 @@ coding_agents/
 ├── main.py              # Entry point with CLI argument parsing
 ├── agent.py             # CodingAgent class - main interface
 ├── helper.py            # Environment and API key utilities
+├── plan.md              # Implementation plan for memory system
 └── lib/
     ├── __init__.py      # Module exports
     ├── coding_agent.py  # Core agent loop with tool execution
-    ├── llm_client.py    # LiteLLM abstraction layer (NEW)
-    ├── model_config.py  # Model registry and provider config (NEW)
+    ├── llm_client.py    # LiteLLM abstraction layer
+    ├── model_config.py  # Model registry and provider config
     ├── sandbox.py       # Local and Docker sandbox implementations
     ├── tools.py         # Tool implementations (file ops, code exec, web research)
     ├── tools_schemas.py # OpenAI function calling schemas
     ├── ui.py            # Gradio web interface
     ├── prompts.py       # System prompts for different modes
     ├── logger.py        # Rich-based logging utilities
-    └── utils.py         # Sandbox factory utilities
+    ├── utils.py         # Sandbox factory utilities
+    └── memory/          # Persistent memory system (NEW)
+        ├── __init__.py          # Package exports
+        ├── manager.py           # MemoryManager - central orchestrator
+        ├── session.py           # SessionManager - session lifecycle
+        ├── integration.py       # Agent loop integration functions
+        ├── types/
+        │   ├── __init__.py
+        │   ├── base.py          # BaseMemory abstract class
+        │   ├── short_term.py    # ShortTermMemory - FIFO buffer
+        │   └── long_term.py     # LongTermMemory - markdown knowledge
+        └── persistence/
+            ├── __init__.py
+            ├── markdown_store.py  # MarkdownMemoryStore - file backend
+            └── checkpoint.py      # CheckpointManager - session snapshots
 ```
 
 ---
