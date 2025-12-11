@@ -73,12 +73,23 @@ coding_agents/
 | `--model` | LLM model (default: `gpt-4.1-mini`) - see Supported Models |
 | `--max-steps` | Maximum agent steps (default: 100) |
 | `--cli` | Run in CLI mode instead of UI |
+| `--memory-path` | Path for persistent memory storage (default: `.agent_memory`) |
+| `--no-persistence` | Disable persistent memory |
+| `--resume` | Session ID to resume from previous run |
+| `--checkpoint-interval` | Steps between checkpoints (default: 100) |
+
+**Session Management Subcommands**:
+```bash
+python main.py sessions list              # List available sessions
+python main.py sessions show <session_id> # Show session details
+python main.py sessions delete <session_id> # Delete a session
+```
 
 ---
 
 ### 2. CodingAgent Class: agent.py
 
-**Purpose**: Main user-facing interface for the universal AI agent. Manages agent lifecycle and sandbox. Despite the name, it now handles research, coding, and file operations.
+**Purpose**: Main user-facing interface for the universal AI agent. Manages agent lifecycle, sandbox, and persistent memory. Despite the name, it now handles research, coding, and file operations.
 
 **Initialization**:
 ```python
@@ -89,6 +100,11 @@ CodingAgent(
     max_steps=100,
     system_prompt=None,
     docker_image=None,
+    # Memory/Session parameters (NEW)
+    memory_path=".agent_memory",     # Path for persistent memory storage
+    enable_persistence=True,         # Enable/disable persistent memory
+    resume_session=None,             # Session ID to resume
+    checkpoint_interval=100,         # Steps between checkpoints
 )
 ```
 
@@ -100,6 +116,9 @@ CodingAgent(
 | `run_with_logging(query)` | Run with console logging |
 | `launch_ui()` | Launch Gradio web interface |
 | `cleanup()` | Kill sandbox and free resources |
+| `list_sessions()` | List available sessions (NEW) |
+| `get_current_session()` | Get current session ID (NEW) |
+| `end_session(summary)` | End session with optional summary (NEW) |
 
 ---
 
@@ -269,7 +288,94 @@ Exports `tools_schemas` list containing all 10 tool schemas in OpenAI function f
 
 ---
 
-### 11. Supporting Files
+### 11. Memory System: lib/memory/ (NEW)
+
+**Purpose**: Provides persistent memory storage and session management for long-running, resumable agents.
+
+#### Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `MemoryManager` | `manager.py` | Central orchestrator for all memory operations |
+| `SessionManager` | `session.py` | Session lifecycle and checkpoint management |
+| `ShortTermMemory` | `types/short_term.py` | FIFO buffer for recent observations |
+| `LongTermMemory` | `types/long_term.py` | Persistent knowledge storage (facts, patterns, learnings) |
+| `MarkdownMemoryStore` | `persistence/markdown_store.py` | Markdown file backend |
+| `CheckpointManager` | `persistence/checkpoint.py` | Session state snapshots |
+
+#### Storage Structure
+
+```
+.agent_memory/
+├── index.md                 # Quick lookup index
+├── sessions/
+│   └── session_xxx.md       # Session checkpoints (YAML frontmatter)
+├── long_term/
+│   ├── knowledge.md         # Facts, patterns, API info
+│   └── learnings.md         # Error resolutions, successful approaches
+└── short_term/
+    └── buffer.md            # Recent observations (FIFO)
+```
+
+#### Memory Types
+
+| Type | Storage | Purpose |
+|------|---------|---------|
+| `observation` | Short-term buffer | Tool results, recent actions |
+| `fact` | `knowledge.md` | Project facts and configuration |
+| `pattern` | `knowledge.md` | Discovered patterns and best practices |
+| `api_info` | `knowledge.md` | API endpoints, configurations |
+| `learning` | `learnings.md` | Error resolutions, successful approaches |
+
+#### MemoryManager API
+
+```python
+from lib.memory import MemoryManager
+
+manager = MemoryManager(
+    storage_path=".agent_memory",
+    llm_client=client,           # For LLM-based summarization
+    short_term_capacity=100,     # FIFO buffer size
+    consolidation_threshold=50,  # Trigger consolidation at this count
+)
+
+# Add memories
+manager.add_memory("Found main.py in project root", memory_type="observation")
+manager.add_memory("Project uses Python 3.12", memory_type="fact")
+manager.add_memory("Use absolute imports for this codebase", memory_type="learning")
+
+# Retrieve relevant context
+memories = manager.retrieve_context(query="What files are in this project?", top_k=10)
+
+# Session management
+session_id = manager.start_session(task="Implement authentication feature")
+manager.checkpoint(step=100, messages=messages, task="Auth feature", progress="JWT done")
+manager.end_session(summary="Completed JWT auth implementation")
+
+# Resume session
+session_id = manager.start_session(resume_id="session_abc123")
+state = manager.restore_session("session_abc123")
+```
+
+#### Integration Functions (lib/memory/integration.py)
+
+```python
+from lib.memory.integration import inject_memories, extract_observation, should_checkpoint
+
+# Inject memories into conversation
+messages = inject_memories(messages, relevant_memories)
+
+# Extract observation from tool result
+observation = extract_observation("execute_code", result, arguments)
+
+# Check if checkpoint is needed
+if should_checkpoint(step=150, interval=100):
+    manager.checkpoint(...)
+```
+
+---
+
+### 12. Supporting Files
 
 #### lib/logger.py
 Rich-based logging with emoji indicators (✨ INFO, ❌ ERROR, 🤖 TOOL)
