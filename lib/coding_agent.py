@@ -8,6 +8,24 @@ from .tools import execute_tool
 from .sandbox import BaseSandbox
 from .model_config import get_model_config, ModelConfig
 from .memory.integration import inject_memories, extract_observation, should_checkpoint
+from .hooks import HookManager, HookEvent, HookContext, HookResult
+
+# Global hook manager instance - can be customized per session
+_global_hook_manager: Optional[HookManager] = None
+
+
+def get_hook_manager() -> HookManager:
+    """Get or create the global hook manager."""
+    global _global_hook_manager
+    if _global_hook_manager is None:
+        _global_hook_manager = HookManager()
+    return _global_hook_manager
+
+
+def set_hook_manager(manager: HookManager) -> None:
+    """Set a custom hook manager."""
+    global _global_hook_manager
+    _global_hook_manager = manager
 
 # IPython is optional (only needed for notebook environments)
 try:
@@ -144,6 +162,8 @@ def coding_agent(
     model: str = "gpt-4.1-mini",
     memory_manager: Optional[Any] = None,
     checkpoint_interval: int = 100,
+    hook_manager: Optional[HookManager] = None,
+    session_id: Optional[str] = None,
     **model_kwargs,
 ) -> Generator[tuple[dict, dict, int], None, tuple[list[dict], int]]:
     """
@@ -162,15 +182,41 @@ def coding_agent(
         model: Model name (supports OpenAI, Anthropic, Gemini)
         memory_manager: Optional MemoryManager for persistent memory
         checkpoint_interval: Steps between checkpoints (default: 100)
+        hook_manager: Optional HookManager for lifecycle hooks
+        session_id: Optional session identifier for hooks
         **model_kwargs: Additional model parameters
     """
     # Get model configuration for dynamic system role and compression
     model_config = get_model_config(model)
 
+    # Use provided hook manager or global one
+    hooks = hook_manager or get_hook_manager()
+
     if messages is None:
         messages = []
     # up to here
     start_index = len(messages)
+
+    # Trigger UserPromptSubmit hook
+    prompt_hook_result = hooks.trigger(
+        HookEvent.UserPromptSubmit,
+        query=query,
+        messages=messages,
+        session_id=session_id,
+    )
+
+    # Check if hook wants to block (e.g., content filtering)
+    if prompt_hook_result.block:
+        logger.warning(f"[hooks] User prompt blocked: {prompt_hook_result.reason}")
+        # Return early with a blocked message
+        blocked_msg = {
+            "role": "assistant",
+            "content": f"Request blocked: {prompt_hook_result.reason}"
+        }
+        messages.append(blocked_msg)
+        yield blocked_msg, messages, usage
+        return messages, usage
+
     user_message = {"role": "user", "content": query}
     messages.append(user_message)
     yield user_message, messages, usage
@@ -208,7 +254,54 @@ def coding_agent(
             if part.type == "function_call":
                 has_function_call = True
                 name = part.name
-                result, metadata = execute_tool(name, part.arguments, tools, sbx=sbx)
+                arguments = part.arguments
+
+                # Parse arguments to dict for hook context (arguments from LLM is usually a JSON string)
+                try:
+                    args_for_hook = json.loads(arguments) if isinstance(arguments, str) else arguments
+                except (json.JSONDecodeError, TypeError):
+                    args_for_hook = {}
+
+                # Trigger PreToolUse hook
+                pre_tool_result = hooks.trigger(
+                    HookEvent.PreToolUse,
+                    tool_name=name,
+                    arguments=args_for_hook if isinstance(args_for_hook, dict) else {},
+                    messages=messages,
+                    session_id=session_id,
+                )
+
+                # Check if hook wants to block the tool execution
+                if pre_tool_result.block:
+                    logger.warning(f"[hooks] Tool '{name}' blocked: {pre_tool_result.reason}")
+                    result = {"error": f"Tool blocked: {pre_tool_result.reason}"}
+                    metadata = {"blocked_by_hook": True}
+                else:
+                    # Apply any argument modifications from hooks
+                    if pre_tool_result.modified_arguments:
+                        # Convert modified arguments back to JSON string for execute_tool
+                        arguments = json.dumps(pre_tool_result.modified_arguments)
+                        logger.debug(f"[hooks] Tool arguments modified by hook")
+
+                    result, metadata = execute_tool(name, arguments, tools, sbx=sbx)
+
+                # Trigger PostToolUse hook
+                # Parse arguments to dict if it's a string (for hook context)
+                args_dict = json.loads(arguments) if isinstance(arguments, str) else arguments
+                post_tool_result = hooks.trigger(
+                    HookEvent.PostToolUse,
+                    tool_name=name,
+                    arguments=args_dict if isinstance(args_dict, dict) else {},
+                    result=result,
+                    messages=messages,
+                    session_id=session_id,
+                )
+
+                # Apply any result modifications from hooks
+                if post_tool_result.modified_result is not None:
+                    result = post_tool_result.modified_result
+                    logger.debug(f"[hooks] Tool result modified by hook")
+
                 result_msg = {
                     "type": "function_call_output",
                     "call_id": part.call_id,
@@ -222,7 +315,7 @@ def coding_agent(
                 if memory_manager:
                     try:
                         result_str = json.dumps(result) if isinstance(result, dict) else str(result)
-                        observation = extract_observation(name, result_str, part.arguments)
+                        observation = extract_observation(name, result_str, arguments)
                         memory_manager.add_memory(observation, memory_type="observation", tool_name=name)
                     except Exception as e:
                         logger.warning(f"Failed to store observation: {e}")
@@ -244,6 +337,14 @@ def coding_agent(
 
         if not has_function_call:
             break
+
+    # Trigger Stop hook when agent finishes
+    hooks.trigger(
+        HookEvent.Stop,
+        messages=messages,
+        session_id=session_id,
+        metadata={"total_steps": steps, "usage": usage},
+    )
 
     return messages, usage
 

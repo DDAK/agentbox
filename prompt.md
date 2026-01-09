@@ -28,7 +28,7 @@ This test the hooks and triggers
 
 ## Implementation Progress
 
-### Iteration 1: Created hooks module with types and manager
+### Iteration 1: Created hooks module with types and manager [COMPLETED]
 - Created `lib/hooks/` module with:
   - `__init__.py` - Module initialization and exports
   - `types.py` - HookEvent enum, HookContext and HookResult dataclasses
@@ -45,7 +45,38 @@ This test the hooks and triggers
   - Hook triggering with context merging
   - Result merging for multiple handlers
 
-**Next steps:**
-- Integrate hooks into CodingAgent class
-- Integrate hooks into coding_agent loop
-- Write tests
+### Iteration 2: Integrated hooks into coding_agent and added tests [COMPLETED]
+- Integrated hooks into `lib/coding_agent.py`:
+  - Added `get_hook_manager()` and `set_hook_manager()` for global hook manager access
+  - Added `hook_manager` and `session_id` parameters to `coding_agent()` function
+  - Added `UserPromptSubmit` hook trigger after query received (with blocking support)
+  - Added `PreToolUse` hook trigger before tool execution (with blocking and argument modification)
+  - Added `PostToolUse` hook trigger after tool execution (with result modification)
+  - Added `Stop` hook trigger when agent finishes
+
+- Created comprehensive test suite:
+  - `tests/test_hooks.py` - 41 unit tests for hooks module
+  - `tests/test_hooks_integration.py` - 11 integration tests for hooks in coding_agent
+
+**All 52 tests passing!**
+
+**Hook Integration Points:**
+| Hook Event | Integration Point | Capabilities |
+|------------|-------------------|--------------|
+| UserPromptSubmit | After query received, before LLM call | Can block requests |
+| PreToolUse | Before execute_tool() | Can block or modify arguments |
+| PostToolUse | After execute_tool() | Can modify results |
+| Stop | When agent loop completes | Logging, cleanup |
+
+**Usage Example:**
+```python
+from lib import HookManager, HookEvent, HookResult, get_hook_manager
+
+hooks = get_hook_manager()
+
+@hooks.on(HookEvent.PreToolUse)
+def block_dangerous_commands(ctx):
+    if ctx.tool_name == "bash" and "rm -rf" in ctx.arguments.get("command", ""):
+        return HookResult.deny("Dangerous command blocked")
+    return HookResult.allow()
+```
