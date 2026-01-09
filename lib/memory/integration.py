@@ -7,10 +7,10 @@ Provides functions for:
 - Managing context intelligently
 """
 
-from typing import Optional
+from typing import Optional, List
 
 
-def inject_memories(messages: list[dict], memories: list[str]) -> list[dict]:
+def inject_memories(messages: List[dict], memories: List[str]) -> List[dict]:
     """
     Inject retrieved memories into the conversation context.
 
@@ -98,9 +98,9 @@ def extract_observation(
 
 def format_context_summary(
     task: str,
-    progress: list[str],
-    recent_actions: list[str],
-    key_learnings: list[str],
+    progress: List[str],
+    recent_actions: List[str],
+    key_learnings: List[str],
 ) -> str:
     """
     Format a context summary for checkpoint or injection.
@@ -176,10 +176,10 @@ def extract_task_from_query(query: str) -> str:
 
 
 def merge_messages_with_context(
-    messages: list[dict],
-    context: list[str],
+    messages: List[dict],
+    context: List[str],
     recent_limit: int = 10,
-) -> list[dict]:
+) -> List[dict]:
     """
     Merge messages with retrieved context intelligently.
 
@@ -220,7 +220,7 @@ def merge_messages_with_context(
     return result
 
 
-def clean_messages_for_storage(messages: list[dict]) -> list[dict]:
+def clean_messages_for_storage(messages: List[dict]) -> List[dict]:
     """
     Clean messages for storage by removing internal markers.
 

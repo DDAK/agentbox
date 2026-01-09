@@ -8,7 +8,7 @@ for memory operations, and handles consolidation and retrieval.
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 from .types.short_term import ShortTermMemory
 from .types.long_term import LongTermMemory
@@ -113,7 +113,7 @@ class MemoryManager:
         top_k: int = 10,
         include_recent: bool = True,
         include_knowledge: bool = True,
-    ) -> list[str]:
+    ) -> List[str]:
         """
         Retrieve relevant context for a query.
 
@@ -155,7 +155,7 @@ class MemoryManager:
     def checkpoint(
         self,
         step: int,
-        messages: list[dict],
+        messages: List[dict],
         task: str = "",
         progress: str = "",
     ) -> str:
@@ -218,7 +218,7 @@ class MemoryManager:
         with self._lock:
             return self.session_manager.restore(session_id)
 
-    def list_sessions(self, status: Optional[str] = None) -> list[dict]:
+    def list_sessions(self, status: Optional[str] = None) -> List[dict]:
         """
         List available sessions.
 
@@ -255,7 +255,7 @@ class MemoryManager:
             timestamp=datetime.now().isoformat(),
         )
 
-    def _summarize_with_llm(self, memories: list[str]) -> str:
+    def _summarize_with_llm(self, memories: List[str]) -> str:
         """
         Use LLM to synthesize memories into insight.
 

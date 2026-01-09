@@ -5,7 +5,7 @@ Defines the interface that all memory types must implement.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, List
 import uuid
 
 
@@ -27,7 +27,7 @@ class BaseMemory(ABC):
         pass
 
     @abstractmethod
-    def retrieve(self, query: str, top_k: int = 5) -> list[str]:
+    def retrieve(self, query: str, top_k: int = 5) -> List[str]:
         """
         Retrieve relevant memories.
 

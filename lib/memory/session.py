@@ -11,7 +11,7 @@ Manages agent session lifecycle including:
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from .persistence.markdown_store import MarkdownMemoryStore
 from .persistence.checkpoint import CheckpointManager
@@ -74,7 +74,7 @@ class SessionManager:
 
     def checkpoint(
         self,
-        messages: list[dict],
+        messages: List[dict],
         task: str = "",
         progress: str = "",
         sandbox_state: Optional[dict] = None,
@@ -146,7 +146,7 @@ class SessionManager:
             self.current_step = state.get("step", 0)
         return state
 
-    def list_sessions(self, status: Optional[str] = None) -> list[dict]:
+    def list_sessions(self, status: Optional[str] = None) -> List[dict]:
         """
         List all available sessions.
 

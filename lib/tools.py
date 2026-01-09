@@ -9,7 +9,7 @@ import os
 import fnmatch
 import glob as glob_module
 import re
-from typing import Callable, Optional, List, Dict, Any
+from typing import Callable, Optional, List, Dict, Any, Tuple
 
 from .sandbox import BaseSandbox
 
@@ -61,14 +61,14 @@ def secure_path(requested_path: str, working_dir: str = None) -> str:
     return target_real
 
 
-def execute_code(sbx: BaseSandbox, code: str, language: str = "python") -> tuple[dict, dict]:
+def execute_code(sbx: BaseSandbox, code: str, language: str = "python") -> Tuple[dict, dict]:
     """Execute code in the sandbox."""
     execution = sbx.run_code(code, language)
     metadata = {}
     return execution.to_json(), metadata
 
 
-def execute_bash(sbx: BaseSandbox, code: str) -> tuple[dict, dict]:
+def execute_bash(sbx: BaseSandbox, code: str) -> Tuple[dict, dict]:
     """Execute bash command in the sandbox."""
     return execute_code(sbx, code, language="bash")
 
@@ -79,7 +79,7 @@ def list_directory(
     ignore: Optional[List[str]] = None,
     offset: int = 0,
     limit: Optional[int] = 16,
-) -> tuple[dict, dict]:
+) -> Tuple[dict, dict]:
     """List directory contents with pagination."""
     working_dir = sbx.working_dir
     path = secure_path(path, working_dir)
@@ -116,7 +116,7 @@ def read_file(
     file_path: str,
     limit: Optional[int] = None,
     offset: int = 0,
-) -> tuple[dict, dict]:
+) -> Tuple[dict, dict]:
     """Read file content with optional offset and limit."""
     working_dir = sbx.working_dir
     file_path = secure_path(file_path, working_dir)
@@ -142,7 +142,7 @@ def write_file(
     sbx: BaseSandbox,
     content: str,
     file_path: str,
-) -> tuple[dict, dict]:
+) -> Tuple[dict, dict]:
     """Write content to file, creating directories if needed."""
     working_dir = sbx.working_dir
     file_path = secure_path(file_path, working_dir)
@@ -173,7 +173,7 @@ def replace_in_file(
     old_string: str,
     new_string: str,
     expected_replacements: int = 1,
-) -> tuple[dict, dict]:
+) -> Tuple[dict, dict]:
     """Replace text in file with validation."""
     working_dir = sbx.working_dir
     file_path = secure_path(file_path, working_dir)
@@ -212,7 +212,7 @@ def search_file_content(
     fuzzy_threshold: Optional[int] = None,
     offset: int = 0,
     limit: Optional[int] = 16,
-) -> tuple[dict, dict]:
+) -> Tuple[dict, dict]:
     """Search for pattern in file contents with pagination."""
     working_dir = sbx.working_dir
     path = secure_path(path, working_dir)
@@ -282,7 +282,7 @@ def glob_search(
     ignore: Optional[List[str]] = None,
     offset: int = 0,
     limit: Optional[int] = 16,
-) -> tuple[dict, dict]:
+) -> Tuple[dict, dict]:
     """Find files matching glob pattern with pagination."""
     working_dir = sbx.working_dir
     path = secure_path(path, working_dir)
@@ -350,7 +350,7 @@ def glob_search(
 
 
 # Web tools (no sandbox needed)
-def web_search(query: str, num_results: int = 5, **kwargs) -> tuple[dict, dict]:
+def web_search(query: str, num_results: int = 5, **kwargs) -> Tuple[dict, dict]:
     """Search the web using DuckDuckGo.
 
     Args:
@@ -380,7 +380,7 @@ def web_search(query: str, num_results: int = 5, **kwargs) -> tuple[dict, dict]:
         return {"error": f"Search failed: {str(e)}"}, {}
 
 
-def web_fetch(url: str, max_length: int = 10000, **kwargs) -> tuple[dict, dict]:
+def web_fetch(url: str, max_length: int = 10000, **kwargs) -> Tuple[dict, dict]:
     """Fetch and extract text content from a URL.
 
     Args:
@@ -455,7 +455,7 @@ tools = {
 }
 
 
-def execute_tool(name: str, args: str, tools: dict[str, Callable], **kwargs) -> tuple[dict, dict]:
+def execute_tool(name: str, args: str, tools: Dict[str, Callable], **kwargs) -> Tuple[dict, dict]:
     """Execute a tool by name with the given arguments."""
     metadata = {}
     try:

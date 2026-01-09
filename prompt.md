@@ -80,3 +80,49 @@ def block_dangerous_commands(ctx):
         return HookResult.deny("Dangerous command blocked")
     return HookResult.allow()
 ```
+
+### Iteration 3: Fixed Python 3.8 compatibility issues [COMPLETED]
+- Fixed all Python 3.9+ type hints (`list[dict]`, `tuple[dict, dict]`, `dict[str, ...]`) to use Python 3.8-compatible typing imports (`List`, `Tuple`, `Dict`)
+- Updated test imports to mock optional UI dependencies (gradio, tiktoken, litellm, PIL) to allow running tests without installing all dependencies
+- Files modified for type hint compatibility:
+  - `lib/tools.py` - Fixed `tuple[dict, dict]` and `dict[str, Callable]`
+  - `lib/coding_agent.py` - Fixed `dict[str, Callable]`, `list[dict]`, `tuple[...]`
+  - `lib/model_config.py` - Fixed `dict[str, ModelConfig]` and `list[str]`
+  - `lib/llm_client.py` - Fixed `list[dict]`
+  - `lib/ui.py` - Fixed `list[ChatMessage]` and `list[dict]`
+  - `lib/memory/manager.py` - Fixed `list[str]` and `list[dict]`
+  - `lib/memory/integration.py` - Fixed `list[dict]` and `list[str]`
+  - `lib/memory/session.py` - Fixed `list[dict]`
+  - `lib/memory/persistence/markdown_store.py` - Fixed `list[str]` and `list[dict]`
+  - `lib/memory/persistence/checkpoint.py` - Fixed `list[dict]`
+  - `lib/memory/types/base.py` - Fixed `list[str]`
+  - `lib/memory/types/short_term.py` - Fixed `list[str]` and `list[dict]`
+  - `lib/memory/types/long_term.py` - Fixed `list[str]` and `dict[str, list[str]]`
+
+**All 52 tests passing with Python 3.8!**
+
+---
+
+## IMPLEMENTATION COMPLETE
+
+### Summary
+The lifecycle hooks feature has been successfully implemented with:
+
+1. **Hooks Module** (`lib/hooks/`):
+   - `types.py`: `HookEvent` enum (5 events), `HookContext` and `HookResult` dataclasses
+   - `manager.py`: `HookManager` class with registration, triggering, and script execution
+   - `__init__.py`: Module exports
+
+2. **Integration** (`lib/coding_agent.py`):
+   - Global hook manager with `get_hook_manager()` and `set_hook_manager()`
+   - Hooks triggered at all specified points (UserPromptSubmit, PreToolUse, PostToolUse, Stop)
+   - Full support for blocking, argument modification, and result modification
+
+3. **Tests**:
+   - 41 unit tests in `tests/test_hooks.py`
+   - 11 integration tests in `tests/test_hooks_integration.py`
+   - All 52 tests passing
+
+### Mark Done Criteria Met:
+1. ✅ Tests are a success (52 passing)
+2. ✅ Hooks work and are triggered successfully

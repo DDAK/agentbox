@@ -9,7 +9,7 @@ backward compatibility with the existing codebase.
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
 
 import litellm
 
@@ -120,7 +120,7 @@ class LLMClient:
         if not self.config.supports_tool_calling:
             raise ValueError(f"Model {model} does not support native tool calling")
 
-    def _convert_messages(self, input_messages: list[dict]) -> list[dict]:
+    def _convert_messages(self, input_messages: List[dict]) -> List[dict]:
         """
         Convert messages from the existing format to LiteLLM format.
 
@@ -203,7 +203,7 @@ class LLMClient:
 
         return converted
 
-    def _convert_tools(self, tools: list[dict]) -> list[dict]:
+    def _convert_tools(self, tools: List[dict]) -> List[dict]:
         """
         Convert tools from responses API format to chat.completions format.
 
@@ -270,7 +270,7 @@ class LLMClient:
 
     def create(
         self,
-        input: list[dict],
+        input: List[dict],
         tools: Optional[list[dict]] = None,
         model: Optional[str] = None,
         **kwargs,

@@ -7,7 +7,7 @@ Provides functionality to save and restore agent state for resumable sessions.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from .markdown_store import MarkdownMemoryStore
 
@@ -30,7 +30,7 @@ class CheckpointManager:
         self,
         session_id: str,
         step: int,
-        messages: list[dict],
+        messages: List[dict],
         task: str = "",
         progress: str = "",
         sandbox_state: Optional[dict] = None,
@@ -113,7 +113,7 @@ class CheckpointManager:
 
         return self.store.save_session(session_id, state)
 
-    def list_checkpoints(self, status: Optional[str] = None) -> list[dict]:
+    def list_checkpoints(self, status: Optional[str] = None) -> List[dict]:
         """
         List available checkpoints.
 
@@ -128,7 +128,7 @@ class CheckpointManager:
             sessions = [s for s in sessions if s.get("status") == status]
         return sessions
 
-    def _compress_messages(self, messages: list[dict]) -> str:
+    def _compress_messages(self, messages: List[dict]) -> str:
         """
         Compress messages for storage.
 
@@ -158,7 +158,7 @@ class CheckpointManager:
 
         return "\n".join(compressed_lines)
 
-    def _decompress_messages(self, compressed: str) -> list[dict]:
+    def _decompress_messages(self, compressed: str) -> List[dict]:
         """
         Decompress messages from storage format.
 
@@ -179,7 +179,7 @@ class CheckpointManager:
 
         return messages
 
-    def _generate_summary(self, messages: list[dict]) -> str:
+    def _generate_summary(self, messages: List[dict]) -> str:
         """
         Generate a brief summary of the conversation.
 

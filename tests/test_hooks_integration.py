@@ -10,10 +10,23 @@ Tests that hooks are properly triggered during the agent execution lifecycle:
 
 import pytest
 import json
+import sys
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 
-from lib.hooks import HookEvent, HookContext, HookResult, HookManager
+# Mock optional dependencies before importing lib modules
+sys.modules['gradio'] = Mock()
+sys.modules['gradio_browser'] = Mock()
+sys.modules['gradio_aicontext'] = Mock()
+sys.modules['tiktoken'] = Mock()
+sys.modules['litellm'] = Mock()
+sys.modules['PIL'] = Mock()
+sys.modules['PIL.Image'] = Mock()
+
+# Import hooks directly
+from lib.hooks.types import HookEvent, HookContext, HookResult
+from lib.hooks.manager import HookManager
+
 from lib.coding_agent import (
     coding_agent,
     get_hook_manager,

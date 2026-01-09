@@ -19,8 +19,20 @@ from datetime import datetime
 from unittest.mock import Mock, patch, MagicMock
 import tempfile
 import os
+import sys
 
-from lib.hooks import HookEvent, HookContext, HookResult, HookManager
+# Mock optional dependencies before importing lib modules
+sys.modules['gradio'] = Mock()
+sys.modules['gradio_browser'] = Mock()
+sys.modules['gradio_aicontext'] = Mock()
+sys.modules['tiktoken'] = Mock()
+sys.modules['litellm'] = Mock()
+sys.modules['PIL'] = Mock()
+sys.modules['PIL.Image'] = Mock()
+
+# Now import hooks directly
+from lib.hooks.types import HookEvent, HookContext, HookResult
+from lib.hooks.manager import HookManager
 
 
 class TestHookEvent:

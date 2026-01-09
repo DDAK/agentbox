@@ -1,5 +1,5 @@
 import json
-from typing import Generator, Literal, Optional, Callable, Any
+from typing import Generator, Literal, Optional, Callable, Any, Dict, List, Tuple
 import re
 from .logger import logger, log_tool_call
 from .prompts import *
@@ -44,11 +44,11 @@ STATE_SNAPSHOT_PATTERN = re.compile(
 )
 
 
-def clean_messages_for_llm(messages: list[dict]) -> list[dict]:
+def clean_messages_for_llm(messages: List[dict]) -> List[dict]:
     return [{k: v for k, v in msg.items() if not k.startswith("_")} for msg in messages]
 
 
-def compress_messages(client, messages: list[dict], model_config: ModelConfig) -> list[dict]:
+def compress_messages(client, messages: List[dict], model_config: ModelConfig) -> List[dict]:
     """Compress messages using the compression model from the model config."""
     response = client.responses.create(
         model=model_config.compression_model,
@@ -79,7 +79,7 @@ def compress_messages(client, messages: list[dict], model_config: ModelConfig) -
     return new_messages
 
 
-def format_messages(messages: list[dict]) -> str:
+def format_messages(messages: List[dict]) -> str:
     content = ""
     for message in messages:
         if "role" in message:
@@ -95,7 +95,7 @@ def format_messages(messages: list[dict]) -> str:
     return content
 
 
-def get_compress_message_index(messages: list[dict]) -> int:
+def get_compress_message_index(messages: List[dict]) -> int:
     # couting the number of chars
     chars = [len(json.dumps(message)) for message in messages]
     total_chars = sum(chars)
@@ -109,7 +109,7 @@ def get_compress_message_index(messages: list[dict]) -> int:
     return len(messages)
 
 
-def get_first_user_message_index(messages: list[dict]) -> int:
+def get_first_user_message_index(messages: List[dict]) -> int:
     first_user_message_index = 0
     for index, message in enumerate(messages):
         if "role" in message:
@@ -120,8 +120,8 @@ def get_first_user_message_index(messages: list[dict]) -> int:
 
 
 def maybe_compress_messages(
-    client, messages: list[dict], usage: int, model_config: ModelConfig
-) -> list[dict]:
+    client, messages: List[dict], usage: int, model_config: ModelConfig
+) -> List[dict]:
     """Compress messages if token usage exceeds threshold."""
     if usage <= TOKEN_LIMIT * COMPRESS_THRESHOLD:
         return messages
@@ -153,11 +153,11 @@ def coding_agent(
     client,
     sbx: BaseSandbox,
     query: str,
-    tools: dict[str, Callable],
-    tools_schemas: list[dict],
+    tools: Dict[str, Callable],
+    tools_schemas: List[dict],
     max_steps: int = 5,
     system: Optional[str] = "You are a senior python programmer",
-    messages: Optional[list[dict]] = None,
+    messages: Optional[List[dict]] = None,
     usage: Optional[int] = 0,
     model: str = "gpt-4.1-mini",
     memory_manager: Optional[Any] = None,
@@ -165,7 +165,7 @@ def coding_agent(
     hook_manager: Optional[HookManager] = None,
     session_id: Optional[str] = None,
     **model_kwargs,
-) -> Generator[tuple[dict, dict, int], None, tuple[list[dict], int]]:
+) -> Generator[Tuple[dict, dict, int], None, Tuple[List[dict], int]]:
     """
     Core agent loop supporting multiple LLM providers via LiteLLM.
 

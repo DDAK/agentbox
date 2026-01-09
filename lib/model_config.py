@@ -6,7 +6,7 @@ enabling the coding agent to work with multiple LLM providers.
 """
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal, Optional, Dict, List
 
 Provider = Literal["openai", "anthropic", "gemini"]
 
@@ -24,7 +24,7 @@ class ModelConfig:
 
 
 # Model registry mapping user-facing names to configurations
-MODEL_REGISTRY: dict[str, ModelConfig] = {
+MODEL_REGISTRY: Dict[str, ModelConfig] = {
     # OpenAI models
     "gpt-4.1-mini": ModelConfig(
         provider="openai",
@@ -175,6 +175,6 @@ def get_model_config(model: str) -> ModelConfig:
         )
 
 
-def list_supported_models() -> list[str]:
+def list_supported_models() -> List[str]:
     """Return a list of all supported model names."""
     return list(MODEL_REGISTRY.keys())

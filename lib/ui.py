@@ -1,3 +1,4 @@
+from typing import List
 import gradio as gr
 from gradio import ChatMessage
 from itertools import chain
@@ -17,7 +18,7 @@ def count_tokens(message: dict) -> int:
     return encoding.encode(json.dumps(clean_messages_for_llm([message]))).__len__()
 
 
-def parse_openai_message(part) -> list[ChatMessage]:
+def parse_openai_message(part) -> List[ChatMessage]:
     messages = []
     if "role" in part:
         if part["role"] == "user":
@@ -95,7 +96,7 @@ def maybe_add_assistant_message(messages, agent_kwargs):
     return new_messages
 
 
-def ui(coding_agent, messages: list[dict] = None, host: str = None, **agent_kwargs):
+def ui(coding_agent, messages: List[dict] = None, host: str = None, **agent_kwargs):
     initial_history = (
         list(
             chain.from_iterable([parse_openai_message(message) for message in messages])

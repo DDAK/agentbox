@@ -7,7 +7,7 @@ Provides a FIFO buffer for recent observations with optional persistence.
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from .base import BaseMemory
 
@@ -69,7 +69,7 @@ class ShortTermMemory(BaseMemory):
 
         return memory_id
 
-    def retrieve(self, query: str, top_k: int = 5) -> list[str]:
+    def retrieve(self, query: str, top_k: int = 5) -> List[str]:
         """
         Retrieve relevant observations by keyword search.
 
@@ -94,7 +94,7 @@ class ShortTermMemory(BaseMemory):
         scored.sort(reverse=True)
         return [content for _, content in scored[:top_k]]
 
-    def get_recent(self, limit: int = 10) -> list[dict]:
+    def get_recent(self, limit: int = 10) -> List[dict]:
         """
         Get the most recent observations.
 
@@ -108,7 +108,7 @@ class ShortTermMemory(BaseMemory):
         recent.reverse()
         return recent
 
-    def get_recent_contents(self, limit: int = 10) -> list[str]:
+    def get_recent_contents(self, limit: int = 10) -> List[str]:
         """
         Get content of the most recent observations.
 

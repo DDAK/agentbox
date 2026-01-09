@@ -7,7 +7,7 @@ Provides persistent knowledge storage using markdown files.
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, List
 
 from .base import BaseMemory
 
@@ -91,7 +91,7 @@ class LongTermMemory(BaseMemory):
         """
         return self.add(content, category=learning_type)
 
-    def retrieve(self, query: str, top_k: int = 5) -> list[str]:
+    def retrieve(self, query: str, top_k: int = 5) -> List[str]:
         """
         Retrieve relevant knowledge by keyword search.
 
@@ -117,7 +117,7 @@ class LongTermMemory(BaseMemory):
         results.sort(reverse=True)
         return [content for _, content in results[:top_k]]
 
-    def get_by_category(self, category: str) -> list[str]:
+    def get_by_category(self, category: str) -> List[str]:
         """
         Get all knowledge in a category.
 
@@ -129,7 +129,7 @@ class LongTermMemory(BaseMemory):
         """
         return [m.get("content", "") for m in self._cache.get(category, [])]
 
-    def get_all(self) -> dict[str, list[str]]:
+    def get_all(self) -> Dict[str, List[str]]:
         """
         Get all knowledge organized by category.
 

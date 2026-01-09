@@ -9,7 +9,7 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 try:
     import yaml
@@ -268,7 +268,7 @@ class MarkdownMemoryStore:
         learnings_path.write_text(new_content)
         return learning_id
 
-    def get_recent_observations(self, limit: int = 10) -> list[str]:
+    def get_recent_observations(self, limit: int = 10) -> List[str]:
         """
         Get recent observations from short-term memory.
 
@@ -293,7 +293,7 @@ class MarkdownMemoryStore:
 
         return observations
 
-    def get_knowledge(self, category: Optional[str] = None) -> list[str]:
+    def get_knowledge(self, category: Optional[str] = None) -> List[str]:
         """
         Get knowledge from long-term memory.
 
@@ -318,7 +318,7 @@ class MarkdownMemoryStore:
 
         return knowledge
 
-    def retrieve(self, query: str, top_k: int = 10) -> list[str]:
+    def retrieve(self, query: str, top_k: int = 10) -> List[str]:
         """
         Retrieve relevant memories by keyword search.
 
@@ -465,7 +465,7 @@ class MarkdownMemoryStore:
 
         return None
 
-    def list_sessions(self) -> list[dict]:
+    def list_sessions(self) -> List[dict]:
         """
         List all available sessions.
 
