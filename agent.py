@@ -19,7 +19,8 @@ from lib.utils import create_sandbox, clear_sandboxes
 from lib.sandbox import BaseSandbox
 from lib.logger import logger
 from lib.llm_client import create_llm_client
-from lib.memory import MemoryManager
+from lib.memory import MemoryManager, MemoryHooks
+from lib.coding_agent import get_hook_manager
 from helper import load_env, setup_api_keys_for_litellm
 
 
@@ -89,10 +90,12 @@ class CodingAgent:
         self.sbx: Optional[BaseSandbox] = None
         self.messages = []
 
-        # Initialize memory system
+        # Initialize memory system with hook-based management
         self.memory_manager: Optional[MemoryManager] = None
+        self.memory_hooks: Optional[MemoryHooks] = None
         if enable_persistence:
             self._init_memory(memory_path)
+            self._init_memory_hooks()
             if resume_session:
                 self._restore_session(resume_session)
 
@@ -107,6 +110,24 @@ class CodingAgent:
         except Exception as e:
             logger.warning(f"Failed to initialize memory system: {e}")
             self.memory_manager = None
+
+    def _init_memory_hooks(self):
+        """Initialize and register memory hooks with the global hook manager."""
+        if not self.memory_manager:
+            return
+
+        try:
+            self.memory_hooks = MemoryHooks(
+                self.memory_manager,
+                checkpoint_interval=self.checkpoint_interval,
+                auto_retrieve=True,
+                top_k_context=10,
+            )
+            self.memory_hooks.register_all(get_hook_manager())
+            logger.info("Memory hooks registered with hook manager")
+        except Exception as e:
+            logger.warning(f"Failed to initialize memory hooks: {e}")
+            self.memory_hooks = None
 
     def _restore_session(self, session_id: str):
         """Restore a previous session."""
@@ -253,6 +274,15 @@ class CodingAgent:
 
     def cleanup(self):
         """Kill the sandbox and cleanup resources."""
+        # Unregister memory hooks
+        if self.memory_hooks:
+            try:
+                self.memory_hooks.unregister_all(get_hook_manager())
+                logger.info("Memory hooks unregistered.")
+            except Exception as e:
+                logger.warning(f"Failed to unregister memory hooks: {e}")
+            self.memory_hooks = None
+
         if self.sbx:
             self.sbx.kill()
             logger.info("Sandbox cleaned up.")

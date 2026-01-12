@@ -7,7 +7,7 @@ import base64
 from .tools import execute_tool
 from .sandbox import BaseSandbox
 from .model_config import get_model_config, ModelConfig
-from .memory.integration import inject_memories, extract_observation, should_checkpoint
+from .memory.integration import inject_memories
 from .hooks import HookManager, HookEvent, HookContext, HookResult
 
 # Global hook manager instance - can be customized per session
@@ -169,6 +169,12 @@ def coding_agent(
     """
     Core agent loop supporting multiple LLM providers via LiteLLM.
 
+    Memory management is handled via hooks (MemoryHooks) registered with the
+    hook_manager. When MemoryHooks are registered:
+    - Context retrieval happens in UserPromptSubmit hook
+    - Observation storage happens in PostToolUse hook
+    - Checkpointing happens in Stop hook
+
     Args:
         client: LLM client with .responses.create() interface
         sbx: Sandbox for code execution
@@ -180,8 +186,8 @@ def coding_agent(
         messages: Conversation history
         usage: Token usage counter
         model: Model name (supports OpenAI, Anthropic, Gemini)
-        memory_manager: Optional MemoryManager for persistent memory
-        checkpoint_interval: Steps between checkpoints (default: 100)
+        memory_manager: DEPRECATED - Memory is now handled via hooks
+        checkpoint_interval: DEPRECATED - Configured via MemoryHooks
         hook_manager: Optional HookManager for lifecycle hooks
         session_id: Optional session identifier for hooks
         **model_kwargs: Additional model parameters
@@ -221,18 +227,16 @@ def coding_agent(
     messages.append(user_message)
     yield user_message, messages, usage
 
+    # Get retrieved context from hooks (if MemoryHooks registered)
+    retrieved_context = prompt_hook_result.metadata.get("retrieved_context", [])
+
     steps = 0
     # continue till max_steps
     while steps < max_steps:
-        # Inject relevant memories from long-term storage
+        # Inject relevant memories from hook-retrieved context
         messages_for_llm = clean_messages_for_llm(messages)
-        if memory_manager:
-            try:
-                relevant_memories = memory_manager.retrieve_context(query, top_k=10)
-                if relevant_memories:
-                    messages_for_llm = inject_memories(messages_for_llm, relevant_memories)
-            except Exception as e:
-                logger.warning(f"Failed to retrieve memories: {e}")
+        if retrieved_context:
+            messages_for_llm = inject_memories(messages_for_llm, retrieved_context)
 
         messages_for_llm = maybe_compress_messages(
             client, messages_for_llm, usage, model_config
@@ -311,29 +315,11 @@ def coding_agent(
                 messages.append(result_msg)
                 yield result_msg, messages, usage
 
-                # Store observation in memory
-                if memory_manager:
-                    try:
-                        result_str = json.dumps(result) if isinstance(result, dict) else str(result)
-                        observation = extract_observation(name, result_str, arguments)
-                        memory_manager.add_memory(observation, memory_type="observation", tool_name=name)
-                    except Exception as e:
-                        logger.warning(f"Failed to store observation: {e}")
+                # Note: Observation storage is handled by MemoryHooks.on_post_tool_use()
 
         steps += 1
 
-        # Periodic checkpointing
-        if memory_manager and should_checkpoint(steps, checkpoint_interval):
-            try:
-                memory_manager.checkpoint(
-                    step=steps,
-                    messages=messages,
-                    task=query[:200],
-                    progress=f"Step {steps}/{max_steps}",
-                )
-                logger.info(f"[agent] 💾 Checkpoint saved at step {steps}")
-            except Exception as e:
-                logger.warning(f"Failed to save checkpoint: {e}")
+        # Note: Checkpointing is handled by MemoryHooks.on_stop()
 
         if not has_function_call:
             break
