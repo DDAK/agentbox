@@ -1,74 +1,280 @@
-# Agentbox
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12+-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen?style=for-the-badge" alt="PRs Welcome">
+  <img src="https://img.shields.io/badge/Tests-75%2B%20Passing-success?style=for-the-badge" alt="Tests">
+</p>
 
-An AI-powered coding agent that can create and modify code using LLM APIs (OpenAI, Anthropic, Google) with local or Docker sandbox environments for safe code execution.
+<h1 align="center">Agentbox</h1>
+
+<p align="center">
+  <strong>A production-ready AI coding agent with sandboxed execution</strong>
+</p>
+
+<p align="center">
+  Build, test, and deploy code using natural language. <br/>
+  Supports OpenAI, Anthropic, and Google models with local or Docker sandboxing.
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#features">Features</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#api">API</a> •
+  <a href="#architecture">Architecture</a>
+</p>
+
+---
+
+## Why Agentbox?
+
+| Feature | Agentbox | Other Tools |
+|---------|----------|-------------|
+| **Safe Execution** | Docker sandboxing built-in | Often local-only |
+| **Multi-Provider LLM** | OpenAI, Anthropic, Google | Usually single provider |
+| **Memory & Context** | Automatic compression + persistence | Context window limits |
+| **Extensibility** | Hook-based event system | Hard to customize |
+| **UI + CLI + API** | All three included | Usually one mode |
+
+---
+
+## Quick Start
+
+```bash
+# Clone and setup
+git clone https://github.com/DDAK/agentbox.git && cd agentbox
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# Configure (add your API key)
+cp .env.example .env && nano .env
+
+# Launch!
+python main.py
+```
+
+Open `http://localhost:7860` and start coding with AI.
+
+---
 
 ## Features
 
-- **Dual Sandbox Modes**: Execute code safely in local or Docker environments
-- **Interactive UI**: Gradio-based web interface with chat and optional browser preview
-- **CLI Mode**: Run the agent directly from the command line
-- **Tool-Augmented AI**: File system operations, code execution, and search capabilities
-- **Context Management**: Automatic message compression when context exceeds limits
-- **Flexible Configuration**: Customizable models, system prompts, and execution limits
+### Core Capabilities
+
+- **Multi-Provider LLM Support** — Use GPT-4, Claude, or Gemini interchangeably
+- **Dual Sandbox Modes** — Local execution for speed, Docker for isolation
+- **13 Built-in Tools** — File operations, code execution, web search, and more
+- **Context Management** — Automatic message compression at 60k tokens
+- **Session Persistence** — Save and resume coding sessions
+
+### Advanced Features
+
+- **Lifecycle Hooks** — Intercept and modify agent behavior at 5 key points
+- **Memory System** — Short-term and long-term memory with automatic retrieval
+- **Web Interface** — Gradio-based UI with real-time chat and browser preview
+- **CLI Mode** — Headless operation for servers and automation
+
+---
+
+## Usage
+
+### Web UI (Default)
+
+```bash
+python main.py                          # Local sandbox
+python main.py --sandbox=docker         # Docker sandbox (isolated)
+python main.py --model=claude-3-5-sonnet  # Use Claude
+```
+
+### CLI Mode
+
+```bash
+python main.py --cli
+```
+
+**CLI Commands:**
+- `exit` / `quit` — Exit the agent
+- `help` — Show available commands
+- `pwd` — Show working directory
+
+### All Options
+
+```bash
+python main.py --help
+
+Options:
+  --sandbox {local,docker}  Execution environment (default: local)
+  --working-dir PATH        Working directory for sandbox
+  --docker-image IMAGE      Docker image (default: python:3.12-slim)
+  --model MODEL             LLM model (default: gpt-4.1-mini)
+  --max-steps N             Max agent iterations (default: 100)
+  --cli                     Run in CLI mode
+  --no-share                Don't create public Gradio link
+  --cleanup                 Clear all sandboxes and exit
+```
+
+---
+
+## API
+
+### Programmatic Usage
+
+```python
+from agent import create_agent
+
+# Create an agent
+agent = create_agent(
+    sandbox_type="docker",
+    working_dir="/path/to/project",
+    model="gpt-4.1-mini",
+    max_steps=100
+)
+
+# Run a task
+messages, usage = agent.run_with_logging("Create a REST API with FastAPI")
+
+# Or launch the UI
+agent.launch_ui(share=True)
+
+# Cleanup
+agent.cleanup()
+```
+
+### CodingAgent Methods
+
+| Method | Description |
+|--------|-------------|
+| `setup_sandbox()` | Initialize the sandbox environment |
+| `run(query)` | Run agent with query (returns generator) |
+| `run_with_logging(query)` | Run with console output |
+| `launch_ui(share)` | Launch Gradio web interface |
+| `cleanup()` | Free resources and kill sandbox |
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `execute_code` | Execute Python code in sandbox |
+| `execute_bash` | Execute bash commands |
+| `list_directory` | List directory contents (paginated) |
+| `read_file` | Read file contents |
+| `write_file` | Write/create files |
+| `replace_in_file` | Search and replace |
+| `search_file_content` | Search with regex/literal/fuzzy |
+| `glob_search` | Find files by pattern |
+| `web_search` | DuckDuckGo search |
+| `web_fetch` | Fetch URL content |
+
+---
+
+## Supported Models
+
+| Provider | Models |
+|----------|--------|
+| **OpenAI** | `gpt-4.1-mini`, `gpt-4o`, `gpt-4o-mini`, `gpt-5-mini`, `gpt-5-nano` |
+| **Anthropic** | `claude-3-5-sonnet`, `claude-3-5-haiku`, `claude-3-opus`, `claude-sonnet-4` |
+| **Google** | `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash-exp` |
+
+---
 
 ## Architecture
 
 ```
-agentbox/
-├── main.py              # Entry point with CLI argument parsing
-├── agent.py             # CodingAgent class - main interface
-├── helper.py            # Environment and API key utilities
-└── lib/
-    ├── __init__.py      # Module exports
-    ├── coding_agent.py  # Core agent loop with tool execution
-    ├── sandbox.py       # Local and Docker sandbox implementations
-    ├── tools.py         # Tool implementations (file ops, code exec)
-    ├── tools_schemas.py # OpenAI function calling schemas
-    ├── ui.py            # Gradio web interface
-    ├── prompts.py       # System prompts for different modes
-    ├── logger.py        # Rich-based logging utilities
-    ├── utils.py         # Sandbox factory utilities
-    └── sbx_tools.py     # E2B sandbox tools (alternative impl)
-```
-
-## Application Flow
-
-```
 User Input (CLI or Gradio UI)
-            |
-            v
-      CodingAgent
-      - Manages sandbox lifecycle
-      - Configures model, system prompt, max steps
-      - Routes to UI or CLI mode
-            |
-            v
-      coding_agent()
-      Agent Loop (Reason -> Act cycle):
-      1. Receive user query
-      2. Maybe compress messages (if > 60k tokens)
-      3. Call LLM API with tools
-      4. Execute tool calls via execute_tool()
-      5. Yield results back to UI/CLI
-      6. Repeat until no more tool calls or max steps
-            |
-            v
-         Sandbox
-    +--------------+--------------+
-    |                             |
-LocalSandbox             DockerSandbox
-- Direct execution       - Isolated container
-- No isolation           - Mounted working dir
-- Fast                   - python:3.12-slim default
-            |
-            v
-         Tools
-+-------------------------------------------+
-| execute_code     execute_bash    list_dir |
-| read_file        write_file      replace  |
-| glob             search_file_content      |
-+-------------------------------------------+
+         │
+         ▼
+    CodingAgent
+    ├─ Manages sandbox lifecycle
+    ├─ Configures model & prompts
+    └─ Triggers lifecycle hooks
+         │
+         ▼
+    Agent Loop
+    ├─ SessionStart hook (load context)
+    ├─ UserPromptSubmit hook (retrieve memories)
+    ├─ Compress messages if >60k tokens
+    ├─ Call LLM with tool schemas
+    │   │
+    │   ├─ PreToolUse hook (can block/modify)
+    │   ├─ Execute tool
+    │   └─ PostToolUse hook (can modify results)
+    │
+    └─ Stop hook (checkpoint state)
+         │
+         ▼
+    Sandbox Execution
+    ├─ LocalSandbox (direct, fast)
+    └─ DockerSandbox (isolated, safe)
 ```
+
+### Project Structure
+
+```
+agentbox/
+├── main.py              # CLI entry point
+├── agent.py             # CodingAgent class
+├── lib/
+│   ├── coding_agent.py  # Core agent loop
+│   ├── sandbox.py       # Local & Docker sandboxes
+│   ├── tools.py         # 13 tool implementations
+│   ├── llm_client.py    # Multi-provider LLM interface
+│   ├── ui.py            # Gradio web interface
+│   ├── hooks/           # Lifecycle hooks system
+│   └── memory/          # Session & memory management
+└── tests/               # 75+ tests
+```
+
+---
+
+## Lifecycle Hooks
+
+Extend agent behavior without modifying core code:
+
+```python
+from lib.hooks import HookManager, HookEvent
+
+hooks = HookManager()
+
+@hooks.register(HookEvent.PRE_TOOL_USE)
+def block_dangerous_commands(context):
+    if "rm -rf" in str(context.data.get("args", {})):
+        return {"blocked": True, "reason": "Dangerous command blocked"}
+    return {"blocked": False}
+```
+
+**Available Hooks:**
+- `SessionStart` — Initialize/resume session
+- `UserPromptSubmit` — Before LLM call (can block)
+- `PreToolUse` — Before tool execution (can block/modify)
+- `PostToolUse` — After tool execution (can modify results)
+- `Stop` — Agent finishes turn (checkpoint)
+
+---
+
+## Memory System
+
+Agentbox includes persistent memory across sessions:
+
+- **Short-term Memory** — Recent context and observations
+- **Long-term Memory** — Important facts and code patterns
+- **Automatic Retrieval** — Relevant memories injected into prompts
+- **Checkpointing** — State saved at configurable intervals
+
+---
+
+## Security
+
+| Sandbox | Isolation | Use Case |
+|---------|-----------|----------|
+| **Local** | None | Trusted code, development |
+| **Docker** | Container | Untrusted code, production |
+
+**Security Features:**
+- Path validation (sandbox escape prevention)
+- 300-second execution timeout
+- Working directory confinement
+
+---
 
 ## Installation
 
@@ -78,182 +284,49 @@ LocalSandbox             DockerSandbox
 - Docker (optional, for isolated execution)
 - API key (OpenAI, Anthropic, or Google)
 
-### Setup
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/DDAK/agentbox.git
-   cd agentbox
-   ```
-
-2. Create and activate virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   # or using uv:
-   uv sync
-   ```
-
-4. Configure environment:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your API key(s)
-   ```
-
-## Usage
-
-### Gradio UI (Default)
+### Steps
 
 ```bash
-# Launch with local sandbox (default)
-python main.py
+# 1. Clone
+git clone https://github.com/DDAK/agentbox.git
+cd agentbox
 
-# Launch with Docker sandbox (isolated)
-python main.py --sandbox=docker
+# 2. Virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Launch without public share link
-python main.py --no-share
+# 3. Install dependencies
+pip install -r requirements.txt
+# or: uv sync
 
-# Specify working directory
-python main.py --working-dir=/path/to/project
+# 4. Configure API key
+cp .env.example .env
+# Add your OPENAI_API_KEY, ANTHROPIC_API_KEY, or GOOGLE_API_KEY
 ```
 
-### CLI Mode
+---
 
-```bash
-# Interactive CLI mode
-python main.py --cli
+## Contributing
 
-# With Docker sandbox
-python main.py --cli --sandbox=docker
-```
+Contributions are welcome! Please:
 
-### CLI Commands (in CLI mode)
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-- `exit` or `quit` - Exit the agent
-- `help` - Show available commands
-- `pwd` - Show working directory
-
-### Advanced Options
-
-```bash
-python main.py --help
-
-Options:
-  --sandbox {local,docker}  Sandbox type (default: local)
-  --working-dir PATH        Working directory for the sandbox
-  --docker-image IMAGE      Docker image (default: python:3.12-slim)
-  --no-share                Don't create public Gradio share link
-  --cli                     Run in CLI mode instead of UI
-  --cleanup                 Clear all running sandboxes and exit
-  --model MODEL             Model to use (default: gpt-4.1-mini)
-  --max-steps N             Maximum agent steps (default: 100)
-```
-
-### Programmatic Usage
-
-```python
-from agent import CodingAgent, create_agent
-
-# Create an agent
-agent = create_agent(
-    sandbox_type="local",        # or "docker"
-    working_dir="/path/to/dir",
-    model="gpt-4.1-mini",
-    max_steps=100,
-)
-
-# Run with logging
-messages, usage = agent.run_with_logging("Create a hello world script")
-
-# Or launch the UI
-agent.launch_ui(share=True)
-
-# Cleanup when done
-agent.cleanup()
-```
-
-## Components
-
-### CodingAgent Class
-
-The main interface for the coding agent:
-
-| Method | Description |
-|--------|-------------|
-| `setup_sandbox()` | Initialize the sandbox environment |
-| `run(query)` | Run agent with query, returns generator |
-| `run_with_logging(query)` | Run with console logging |
-| `launch_ui(share, height)` | Launch Gradio web interface |
-| `cleanup()` | Kill sandbox and free resources |
-| `clear_all_sandboxes()` | Static method to cleanup all sandboxes |
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `execute_code` | Execute Python code in sandbox |
-| `execute_bash` | Execute bash commands in sandbox |
-| `list_directory` | List directory contents with pagination |
-| `read_file` | Read file contents (with offset/limit) |
-| `write_file` | Write content to file (creates dirs) |
-| `replace_in_file` | Search and replace in file |
-| `search_file_content` | Search files (literal, regex, or fuzzy) |
-| `glob` | Find files matching glob patterns |
-
-### Sandbox Types
-
-#### LocalSandbox
-- Executes code directly on the host machine
-- No isolation - use with caution
-- Fastest execution
-- Working directory: specified path or current directory
-
-#### DockerSandbox
-- Executes code in an isolated Docker container
-- Working directory mounted at `/workspace`
-- Default image: `python:3.12-slim`
-- Uses host network mode for port access
-
-### System Prompts
-
-The agent includes specialized system prompts:
-
-- **Default**: General-purpose coding assistant with Reason -> Act cycle
-- **Web Dev**: Next.js/TypeScript/Tailwind focused prompt with shadcn/ui
-- **Compress Messages**: For summarizing conversation history when context grows too large
-
-## Context Management
-
-The agent automatically manages context length:
-
-- **Token Limit**: 60,000 tokens
-- **Compression Threshold**: 70% of limit (42,000 tokens)
-- **Compression Method**: Uses a smaller model to create a state snapshot
-- **State Snapshot**: Preserves overall goal, key knowledge, file system state, recent actions, and current plan
-
-## Dependencies
-
-- `openai` - OpenAI API client
-- `anthropic` - Anthropic API client
-- `litellm` - Multi-provider LLM interface
-- `gradio` - Web UI framework
-- `python-dotenv` - Environment variable management
-- `rich` - Terminal formatting and logging
-- `tiktoken` - Token counting
-
-## Security Considerations
-
-- **LocalSandbox**: Executes code without isolation. Only use with trusted inputs.
-- **DockerSandbox**: Provides isolation but mounts the working directory. Sensitive files in working directory are accessible.
-- **Path Security**: Tools enforce paths stay within the working directory
-- **Timeout**: Code execution has a 300-second timeout
+---
 
 ## License
 
-See LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+<p align="center">
+  <strong>If Agentbox helps you, consider giving it a star!</strong><br/>
+  <a href="https://github.com/DDAK/agentbox/stargazers">
+    <img src="https://img.shields.io/github/stars/DDAK/agentbox?style=social" alt="GitHub Stars">
+  </a>
+</p>
